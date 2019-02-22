@@ -6,6 +6,15 @@ import codecs
 from scipy.spatial import distance
 import utils
 import os
+import pickle
+import logging
+import argparse
+
+parser = argparse.ArgumentParser(description="Running XWEAT")
+parser.add_argument("--test_number", type=int, help="Number of the weat test to run", required=True)
+parser.add_argument("--permutation_number", type=int, default=None, help="Number of permutations (otherwise all will be run)")
+parser.add_argument("--output_file", type=str, default=None, help="File to store the results)", required=True)
+args = parser.parse_args()
 
 class WEAT(object):
   """
@@ -245,6 +254,7 @@ class WEAT(object):
 
 
   def weat_p_value(self, T1, T2, A1, A2, sample):
+    logging.info("Calculating p value ... ")
     size_of_permutation = min(len(T1), len(T2))
     T1_T2 = T1 + T2
     observed_test_stats_over_permutations = []
@@ -257,7 +267,8 @@ class WEAT(object):
     for Xi in permutations:
       Yi = filterfalse(lambda w: w in Xi, T1_T2)
       observed_test_stats_over_permutations.append(self.differential_association(Xi, Yi, A1, A2))
-
+      if len(observed_test_stats_over_permutations) % 1000 == 0:
+        logging.info("Iteration %s finished", str(len(observed_test_stats_over_permutations)))
     unperturbed = self.differential_association(T1, T2, A1, A2)
     is_over = np.array([o > unperturbed for o in observed_test_stats_over_permutations])
     return is_over.sum() / is_over.size
@@ -321,8 +332,40 @@ class WEAT(object):
       A2 = [self.embd_dict[w.lower()] for w in attributes_2 if w.lower() in self.embd_dict]
     return self.weat_stats(T1, T2, A1, A2, sample_p)
 
+  def _parse_translations(self, path="./data/vocab_en_ru.csv", new_path="./data/vocab_dict_en_ru.p", is_russian=False):
+    """
+    :param path: path of the csv file edited by our translators
+    :param new_path: path of the clean dict to save
+    >>> WEAT(None)._parse_translations(is_russian=True)
+    293
+    """
+    # This code probably does not work for the russian code, as dmitry did use other columns for his corrections
+    with codecs.open(path, "r", "utf8") as f:
+      translation_dict = {}
+      for line in f.readlines():
+        parts = line.split(",")
+        en = parts[0]
+        if en == "" or en[0].isupper():
+          continue
+        else:
+          if is_russian and parts[3] != "\n" and parts[3] != "\r\n" and parts[3] != "\r":
+              other_m = parts[2]
+              other_f = parts[3].strip()
+              translation_dict[en] = (other_m, other_f)
+          else:
+            other_m = parts[1]
+            other_f = None
+            if parts[2] != "\n" and parts[2] != "\r\n" and parts[2] != "\r" and parts[2] != '':
+              other_f = parts[2].strip()
+            translation_dict[en] = (other_m, other_f)
+      pickle.dump(translation_dict, open(new_path, "wb"))
+      return len(translation_dict)
+
+
+
 def main():
-  print("XWEAT started")
+  logging.basicConfig(level=logging.INFO)
+  logging.info("XWEAT started")
   if os.name == "nt":
     # embd_dict = utils.load_embeddings(
     #    "C:/Users/anlausch/workspace/cnn-text-classification/data/GoogleNews-vectors-negative300.bin", word2vec=True)
@@ -331,12 +374,26 @@ def main():
   else:
     # embd_dict = utils.load_embeddings("~/GoogleNews-vectors-negative300.bin", word2vec=True)
     embd_dict = utils.load_embeddings("/work/anlausch/glove.6B.300d.txt", word2vec=False)
-  print("Embeddings loaded")
+  logging.info("Embeddings loaded")
   weat = WEAT(embd_dict)
-  targets_1, targets_2, attributes_1, attributes_2 = weat.weat_1()
-  print("Running test")
-  print(weat.run_test(targets_1, targets_2, attributes_1, attributes_2, 1000, lower=True))
-
+  if args.test_number == 1:
+    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_1()
+  elif args.test_number == 2:
+    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_2()
+  elif args.test_number == 3:
+    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_3()
+  elif args.test_number == 4:
+    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_3()
+  logging.info("Running test")
+  result = weat.run_test(targets_1, targets_2, attributes_1, attributes_2, args.permutation_number, lower=True)
+  logging.info(result)
+  with codecs.open(args.output_file, "w", "utf8") as f:
+    f.write("Config: ")
+    f.write(str(args.test_number) + " and ")
+    f.write(str(args.permutation_number) + "\n")
+    f.write("Result: ")
+    f.write(str(result))
+    f.close()
 
 if __name__ == "__main__":
   main()
