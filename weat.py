@@ -9,6 +9,7 @@ import os
 import pickle
 import logging
 import argparse
+import time
 
 parser = argparse.ArgumentParser(description="Running XWEAT")
 parser.add_argument("--test_number", type=int, help="Number of the weat test to run", required=True)
@@ -364,6 +365,7 @@ class WEAT(object):
 
 
 def main():
+  start = time.time()
   logging.basicConfig(level=logging.INFO)
   logging.info("XWEAT started")
   if os.name == "nt":
@@ -383,7 +385,7 @@ def main():
   elif args.test_number == 3:
     targets_1, targets_2, attributes_1, attributes_2 = weat.weat_3()
   elif args.test_number == 4:
-    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_3()
+    targets_1, targets_2, attributes_1, attributes_2 = weat.weat_4()
   logging.info("Running test")
   result = weat.run_test(targets_1, targets_2, attributes_1, attributes_2, args.permutation_number, lower=True)
   logging.info(result)
@@ -394,6 +396,9 @@ def main():
     f.write("Result: ")
     f.write(str(result))
     f.close()
+  end = time.time()
+  duration_in_hours = ((end - start)/ 60 ) / 60
+  print(duration_in_hours)
 
 if __name__ == "__main__":
   main()
