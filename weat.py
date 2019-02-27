@@ -3,7 +3,6 @@ import random
 from itertools import filterfalse
 from itertools import combinations
 import codecs
-from scipy.spatial import distance
 import utils
 import os
 import pickle
@@ -321,8 +320,6 @@ class XWEAT(object):
     T1_T2 = T1 + T2
     observed_test_stats_over_permutations = []
     total_possible_permutations = math.factorial(len(T1_T2)) / math.factorial(size_of_permutation) / math.factorial((len(T1_T2)-size_of_permutation))
-    #permutations = combinations(T1_T2, size_of_permutation)
-    #permutations = list(permutations)
     logging.info("Number of possible permutations: %d", total_possible_permutations)
     if not sample or sample >= total_possible_permutations:
       permutations = combinations(T1_T2, size_of_permutation)
@@ -331,10 +328,6 @@ class XWEAT(object):
       permutations = set()
       while len(permutations) < sample:
         permutations.add(tuple(sorted(self._random_permutation(T1_T2, size_of_permutation))))
-   # if sample < len(permutations):
-   #   random.shuffle(permutations)
-   #   logging.info("Taking randomly first %d permutations", sample)
-   #   permutations = permutations[:sample]
 
     for Xi in permutations:
       Yi = filterfalse(lambda w: w in Xi, T1_T2)
