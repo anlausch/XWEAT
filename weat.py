@@ -23,14 +23,18 @@ class XWEAT(object):
   Credits: Basic implementation based on https://gist.github.com/SandyRogers/e5c2e938502a75dcae25216e4fae2da5
   """
 
-  def __init__(self, embd_dict):
-    self.embd_dict = embd_dict
+  def __init__(self):
+    self.embd_dict = None
     self.vocab = None
     self.embedding_matrix = None
+
+  def set_embd_dict(self, embd_dict):
+    self.embd_dict = embd_dict
 
 
   def _build_vocab_dict(self, vocab):
     self.vocab = OrderedDict()
+    vocab = set(vocab)
     index = 0
     for term in vocab:
       if term in self.embd_dict:
@@ -286,46 +290,17 @@ class XWEAT(object):
     return targets, attributes_1, attributes_2
 
 
-  def _euclidean(self, w1, w2):
-    return 1-distance.euclidean(w1, w2)
-
-
-  def _cosine(self, w1, w2):
-    return 1-distance.cosine(w1, w2)
-
-
-  def similarity(self, w1, w2, type="cosine"):
-    if type == "cosine":
-      return self._cosine(w1, w2)
-    return self._euclidean(w1, w2)
-
-
   def similarity_precomputed_sims(self, w1, w2, type="cosine"):
     return self.similarities[w1, w2]
 
-
-  def word_association_with_attribute(self, w, A, B):
-    return np.mean([self.similarity(w, a) for a in A]) - np.mean([self.similarity(w, b) for b in B])
 
   def word_association_with_attribute_precomputed_sims(self, w, A, B):
     return np.mean([self.similarity_precomputed_sims(w, a) for a in A]) - np.mean([self.similarity_precomputed_sims(w, b) for b in B])
 
 
-  def differential_association(self, T1, T2, A1, A2):
-    return np.sum([self.word_association_with_attribute(t1, A1, A2) for t1 in T1]) \
-           - np.sum([self.word_association_with_attribute(t2, A1, A2) for t2 in T2])
-
-
   def differential_association_precomputed_sims(self, T1, T2, A1, A2):
     return np.sum([self.word_association_with_attribute_precomputed_sims(t1, A1, A2) for t1 in T1]) \
            - np.sum([self.word_association_with_attribute_precomputed_sims(t2, A1, A2) for t2 in T2])
-
-
-  def weat_effect_size(self, T1, T2, A1, A2):
-    return (
-             np.mean([self.word_association_with_attribute(t1, A1, A2) for t1 in T1]) -
-             np.mean([self.word_association_with_attribute(t2, A1, A2) for t2 in T2])
-           ) / np.std([self.word_association_with_attribute(w, A1, A2) for w in T1 + T2])
 
 
   def weat_effect_size_precomputed_sims(self, T1, T2, A1, A2):
@@ -339,30 +314,6 @@ class XWEAT(object):
     pool = tuple(iterable)
     r = len(pool) if r is None else r
     return tuple(random.sample(pool, r))
-
-
-  def weat_p_value(self, T1, T2, A1, A2, sample):
-    logging.info("Calculating p value ... ")
-    size_of_permutation = min(len(T1), len(T2))
-    T1_T2 = T1 + T2
-    observed_test_stats_over_permutations = []
-
-    if not sample:
-      permutations = combinations(T1_T2, size_of_permutation)
-    else:
-      permutations = set()
-      while len(permutations) < sample:
-        permutations.add(tuple(sorted(self._random_permutation(T1_T2, size_of_permutation))))
-
-    for Xi in permutations:
-      Yi = filterfalse(lambda w: w in Xi, T1_T2)
-      observed_test_stats_over_permutations.append(self.differential_association(Xi, Yi, A1, A2))
-      if len(observed_test_stats_over_permutations) % 1000 == 0:
-        logging.info("Iteration %s finished", str(len(observed_test_stats_over_permutations)))
-    unperturbed = self.differential_association(T1, T2, A1, A2)
-    is_over = np.array([o > unperturbed for o in observed_test_stats_over_permutations])
-    return is_over.sum() / is_over.size
-
 
   def weat_p_value_precomputed_sims(self, T1, T2, A1, A2, sample):
     logging.info("Calculating p value ... ")
@@ -393,13 +344,6 @@ class XWEAT(object):
     unperturbed = self.differential_association_precomputed_sims(T1, T2, A1, A2)
     is_over = np.array([o > unperturbed for o in observed_test_stats_over_permutations])
     return is_over.sum() / is_over.size
-
-
-  def weat_stats(self, T1, T2, A1, A2, sample_p=None):
-    test_statistic = self.differential_association(T1, T2, A1, A2)
-    effect_size = self.weat_effect_size(T1, T2, A1, A2)
-    p = self.weat_p_value(T1, T2, A1, A2, sample=sample_p)
-    return test_statistic, effect_size, p
 
 
   def weat_stats_precomputed_sims(self, T1, T2, A1, A2, sample_p=None):
@@ -433,33 +377,6 @@ class XWEAT(object):
         f.write(w)
         f.write("\n")
       f.close()
-
-
-  def run_test(self, target_1, target_2, attributes_1, attributes_2, sample_p=None, lower=False):
-    """Run the WEAT test for differential association between two
-    sets of target words and two sets of attributes.
-
-    RETURNS:
-        (d, e, p). A tuple of floats, where d is the WEAT Test statistic,
-        e is the effect size, and p is the one-sided p-value measuring the
-        (un)likeliness of the null hypothesis (which is that there is no
-        difference in association between the two target word sets and
-        the attributes).
-
-        If e is large and p small, then differences in the model between
-        the attribute word sets match differences between the targets.
-    """
-    if not lower:
-      T1 = [self.embd_dict[w] for w in target_1 if w in self.embd_dict]
-      T2 = [self.embd_dict[w] for w in target_2 if w in self.embd_dict]
-      A1 = [self.embd_dict[w] for w in attributes_1 if w in self.embd_dict]
-      A2 = [self.embd_dict[w] for w in attributes_2 if w in self.embd_dict]
-    else:
-      T1 = [self.embd_dict[w.lower()] for w in target_1 if w.lower() in self.embd_dict]
-      T2 = [self.embd_dict[w.lower()] for w in target_2 if w.lower() in self.embd_dict]
-      A1 = [self.embd_dict[w.lower()] for w in attributes_1 if w.lower() in self.embd_dict]
-      A2 = [self.embd_dict[w.lower()] for w in attributes_2 if w.lower() in self.embd_dict]
-    return self.weat_stats(T1, T2, A1, A2, sample_p)
 
 
   def run_test_precomputed_sims(self, target_1, target_2, attributes_1, attributes_2, sample_p=None, similarity_type="cosine"):
@@ -500,11 +417,11 @@ class XWEAT(object):
     self._init_similarities(similarity_type)
     return self.weat_stats_precomputed_sims(T1, T2, A1, A2, sample_p)
 
-  def _parse_translations(self, path="./data/vocab_en_tr.csv", new_path="./data/vocab_dict_en_tr.p", is_russian=False):
+  def _parse_translations(self, path="./data/vocab_en_de.csv", new_path="./data/vocab_dict_en_de.p", is_russian=False):
     """
     :param path: path of the csv file edited by our translators
     :param new_path: path of the clean dict to save
-    >>> XWEAT(None)._parse_translations(is_russian=False)
+    >>> XWEAT()._parse_translations(is_russian=False)
     293
     """
     # This code probably does not work for the russian code, as dmitry did use other columns for his corrections
@@ -558,34 +475,47 @@ def load_embedding_dict(vocab_path="", vector_path="", glove=False):
   return embd_dict
 
 def translate(translation_dict, terms):
-  translation = [translation_dict[t] if t in translation_dict else t for t in terms]
+  translation = []
+  for t in terms:
+    if t in translation_dict or t.lower() in translation_dict:
+      if t.lower() in translation_dict:
+        male, female = translation_dict[t.lower()]
+      elif t in translation_dict:
+        male, female = translation_dict[t]
+      if female is None or female is '':
+        translation.append(male)
+      else:
+        translation.append(male)
+        translation.append(female)
+    else:
+      translation.append(t)
+  translation = list(set(translation))
   return translation
 
 
 def main():
+  def boolean_string(s):
+    if s not in {'False', 'True', 'false', 'true'}:
+      raise ValueError('Not a valid boolean string')
+    return s == 'True' or s == 'true'
   parser = argparse.ArgumentParser(description="Running XWEAT")
   parser.add_argument("--test_number", type=int, help="Number of the weat test to run", required=False)
   parser.add_argument("--permutation_number", type=int, default=None,
                       help="Number of permutations (otherwise all will be run)", required=False)
   parser.add_argument("--output_file", type=str, default=None, help="File to store the results)", required=False)
-  parser.add_argument("--lower", type=bool, default=False, help="Whether to lower the vocab", required=False)
+  parser.add_argument("--lower", type=boolean_string, default=False, help="Whether to lower the vocab", required=True)
   parser.add_argument("--similarity_type", type=str, default="cosine", help="Which similarity function to use",
                       required=False)
   parser.add_argument("--embedding_vocab", type=str, help="Vocab of the embeddings")
   parser.add_argument("--embedding_vectors", type=str, help="Vectors of the embeddings")
-  parser.add_argument("--use_glove", type=bool, default=False, help="Use glove")
+  parser.add_argument("--use_glove", type=boolean_string, default=False, help="Use glove")
   parser.add_argument("--lang", type=str, default="en", help="Language to test")
   args = parser.parse_args()
 
   start = time.time()
   logging.basicConfig(level=logging.INFO)
   logging.info("XWEAT started")
-  if args.use_glove:
-    embd_dict = load_embedding_dict(glove=True)
-  else:
-    embd_dict = load_embedding_dict(vocab_path=args.embedding_vocab, vector_path=args.embedding_vectors, glove=False)
-  logging.info("Embeddings loaded")
-  weat = XWEAT(embd_dict)
+  weat = XWEAT()
   if args.test_number == 1:
     targets_1, targets_2, attributes_1, attributes_2 = weat.weat_1()
   elif args.test_number == 2:
@@ -610,17 +540,27 @@ def main():
     raise ValueError("Only WEAT 1 to 10 are supported")
 
   if args.lang != "en":
+    logging.info("Translating terms from en to %s", args.lang)
     translation_dict = load_vocab_goran("./data/vocab_dict_en_" + args.lang + ".p")
     targets_1 = translate(translation_dict, targets_1)
+    targets_2 = translate(translation_dict, targets_2)
+    attributes_1 = translate(translation_dict, attributes_1)
+    attributes_2 = translate(translation_dict, attributes_2)
 
-  logging.info("Running test")
-  # TODO: both target lists should have the same length and both attribute lists aswell
   if args.lower:
     targets_1 = [t.lower() for t in targets_1]
     targets_2 = [t.lower() for t in targets_2]
     attributes_1 = [a.lower() for a in attributes_1]
     attributes_2 = [a.lower() for a in attributes_2]
 
+  if args.use_glove:
+    embd_dict = load_embedding_dict(glove=True)
+  else:
+    embd_dict = load_embedding_dict(vocab_path=args.embedding_vocab, vector_path=args.embedding_vectors, glove=False)
+  weat.set_embd_dict(embd_dict)
+
+  logging.info("Embeddings loaded")
+  logging.info("Running test")
   result = weat.run_test_precomputed_sims(targets_1, targets_2, attributes_1, attributes_2, args.permutation_number, args.similarity_type)
   logging.info(result)
   with codecs.open(args.output_file, "w", "utf8") as f:
