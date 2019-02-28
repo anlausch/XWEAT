@@ -8,7 +8,7 @@
 #                      required=False)
 #  parser.add_argument("--embedding_file", type=str)
 
-for similarity_type in "cosine" "csls" ; do
+for similarity_type in "cosine" ; do
     for test_number in 1 2 3 4 5 6 7 8 9 10 ; do
         echo $similarity_type
         echo $test_number
@@ -18,6 +18,6 @@ for similarity_type in "cosine" "csls" ; do
             --output_file ./results/glove_${similarity_type}_${test_number}.res \
             --lower True \
             --use_glove True \
-            --similarity_type $similarity_type > ./results/glove_${similarity_type}_${test_number}.out
+            --similarity_type $similarity_type |& tee ./results/glove_${similarity_type}_${test_number}.out
     done
 done

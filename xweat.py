@@ -26,42 +26,69 @@ class XWEAT(object):
   def __init__(self):
     self.embd_dict = None
     self.vocab = None
-    self.embedding_matrix = None
+    self.targets_embedding_matrix = None
+    self.attributes_embedding_matrix = None
 
-  def set_embd_dict(self, embd_dict):
-    self.embd_dict = embd_dict
+  def set_embd_dicts(self, targets_embd_dict, attributes_embd_dict):
+    self.targets_embd_dict = targets_embd_dict
+    self.attributes_embd_dict = attributes_embd_dict
 
 
-  def _build_vocab_dict(self, vocab):
-    self.vocab = OrderedDict()
-    vocab = set(vocab)
+  def _build_vocab_dicts(self, targets_vocab, attributes_vocab):
+    self.targets_vocab = OrderedDict()
+    self.attributes_vocab = OrderedDict()
+    targets_vocab = set(targets_vocab)
+    attributes_vocab = set(attributes_vocab)
     index = 0
-    for term in vocab:
-      if term in self.embd_dict:
-        self.vocab[term] = index
+    for term in targets_vocab:
+      if term in self.targets_embd_dict:
+        self.targets_vocab[term] = index
         index += 1
       else:
-        logging.warning("Not in vocab %s", term)
+        logging.warning("Not in targets vocab %s", term)
+    index = 0
+    for term in attributes_vocab:
+      if term in self.attributes_embd_dict:
+        self.attributes_vocab[term] = index
+        index += 1
+      else:
+        logging.warning("Not in attributes vocab %s", term)
 
 
-  def convert_by_vocab(self, items):
+  def convert_by_vocab(self, items, type="targets"):
     """Converts a sequence of [tokens|ids] using the vocab."""
     output = []
-    for item in items:
-      if item in self.vocab:
-        output.append(self.vocab[item])
-      else:
-        continue
+    if type == "targets":
+      for item in items:
+        if item in self.targets_vocab:
+          output.append(self.targets_vocab[item])
+        else:
+          continue
+    elif type == "attributes":
+      for item in items:
+        if item in self.attributes_vocab:
+          output.append(self.attributes_vocab[item])
+        else:
+          continue
+    else:
+      raise NotImplementedError()
     return output
 
   def _build_embedding_matrix(self):
-    self.embedding_matrix = []
-    for term, index in self.vocab.items():
-      if term in self.embd_dict:
-        self.embedding_matrix.append(self.embd_dict[term])
+    self.targets_embedding_matrix = []
+    for term, index in self.targets_vocab.items():
+      if term in self.targets_embd_dict:
+        self.targets_embedding_matrix.append(self.targets_embd_dict[term])
       else:
         raise AssertionError("This should not happen.")
-    self.embd_dict = None
+    self.targets_embd_dict = None
+    self.attributes_embedding_matrix = []
+    for term, index in self.attributes_vocab.items():
+      if term in self.attributes_embd_dict:
+        self.attributes_embedding_matrix.append(self.attributes_embd_dict[term])
+      else:
+        raise AssertionError("This should not happen.")
+    self.attributes_embd_dict = None
 
 
   def mat_normalize(self,mat, norm_order=2, axis=1):
@@ -99,11 +126,11 @@ class XWEAT(object):
 
   def _init_similarities(self, similarity_type):
     if similarity_type == "cosine":
-      self.similarities = self.cosine(self.embedding_matrix, self.embedding_matrix)
+      self.similarities = self.cosine(self.targets_embedding_matrix, self.attributes_embedding_matrix)
     elif similarity_type == "csls":
-      self.similarities = self.csls(self.embedding_matrix, self.embedding_matrix)
+      self.similarities = self.csls(self.targets_embedding_matrix, self.attributes_embedding_matrix)
     elif similarity_type == "euclidean":
-      self.similarities = self.euclidean(self.embedding_matrix, self.embedding_matrix)
+      self.similarities = self.euclidean(self.targets_embedding_matrix, self.attributes_embedding_matrix)
     else:
       raise NotImplementedError()
 
@@ -400,12 +427,14 @@ class XWEAT(object):
         If e is large and p small, then differences in the model between
         the attribute word sets match differences between the targets.
     """
-    vocab = target_1 + target_2 + attributes_1 + attributes_2
-    self._build_vocab_dict(vocab)
-    T1 = self.convert_by_vocab(target_1)
-    T2 = self.convert_by_vocab(target_2)
-    A1 = self.convert_by_vocab(attributes_1)
-    A2 = self.convert_by_vocab(attributes_2)
+    #vocab = target_1 + target_2 + attributes_1 + attributes_2
+    targets_vocab = target_1 + target_2
+    attributes_vocab = attributes_1 + attributes_2
+    self._build_vocab_dicts(targets_vocab=targets_vocab, attributes_vocab=attributes_vocab)
+    T1 = self.convert_by_vocab(target_1, type="targets")
+    T2 = self.convert_by_vocab(target_2, type="targets")
+    A1 = self.convert_by_vocab(attributes_1, type="attributes")
+    A2 = self.convert_by_vocab(attributes_2, type="attributes")
     while len(T1) < len(T2):
       logging.info("Popped T2 %d", T2[-1])
       T2.pop(-1)
@@ -513,16 +542,24 @@ def main():
   parser.add_argument("--lower", type=boolean_string, default=False, help="Whether to lower the vocab", required=True)
   parser.add_argument("--similarity_type", type=str, default="cosine", help="Which similarity function to use",
                       required=False)
-  parser.add_argument("--embedding_vocab", type=str, help="Vocab of the embeddings")
-  parser.add_argument("--embedding_vectors", type=str, help="Vectors of the embeddings")
   parser.add_argument("--use_glove", type=boolean_string, default=False, help="Use glove")
-  parser.add_argument("--lang", type=str, default="en", help="Language to test")
+
+  parser.add_argument("--attributes_embedding_vocab", type=str, help="Vocab of the embeddings")
+  parser.add_argument("--attributes_embedding_vectors", type=str, help="Vectors of the embeddings")
+
+  parser.add_argument("--targets_embedding_vocab", type=str, help="Vocab of the embeddings")
+  parser.add_argument("--targets_embedding_vectors", type=str, help="Vectors of the embeddings")
+
+  parser.add_argument("--attributes_lang", type=str, default="en", help="Language of the attribute words")
+  parser.add_argument("--targets_lang", type=str, default="en", help="Language of the target words")
   args = parser.parse_args()
 
   start = time.time()
   logging.basicConfig(level=logging.INFO)
   logging.info("XWEAT started")
   weat = XWEAT()
+
+  # load specific test vocab
   if args.test_number == 1:
     targets_1, targets_2, attributes_1, attributes_2 = weat.weat_1()
   elif args.test_number == 2:
@@ -546,11 +583,15 @@ def main():
   else:
     raise ValueError("Only WEAT 1 to 10 are supported")
 
-  if args.lang != "en":
-    logging.info("Translating terms from en to %s", args.lang)
-    translation_dict = load_vocab_goran("./data/vocab_dict_en_" + args.lang + ".p")
+  if args.targets_lang != "en":
+    logging.info("Translating target terms from en to %s", args.targets_lang)
+    translation_dict = load_vocab_goran("./data/vocab_dict_en_" + args.targets_lang + ".p")
     targets_1 = translate(translation_dict, targets_1)
     targets_2 = translate(translation_dict, targets_2)
+
+  if args.attributes_lang != "en":
+    logging.info("Translating attribute terms from en to %s", args.attributes_lang)
+    translation_dict = load_vocab_goran("./data/vocab_dict_en_" + args.attributes_lang + ".p")
     attributes_1 = translate(translation_dict, attributes_1)
     attributes_2 = translate(translation_dict, attributes_2)
 
@@ -560,12 +601,17 @@ def main():
     attributes_1 = [a.lower() for a in attributes_1]
     attributes_2 = [a.lower() for a in attributes_2]
 
-  if args.use_glove:
-    logging.info("Using glove")
-    embd_dict = load_embedding_dict(glove=True)
+
+  if args.use_glove and args.attributes_lang == "en" and args.targets_lang == "en":
+    targets_embd_dict = load_embedding_dict(glove=True)
+    attributes_embd_dict = load_embedding_dict(glove=True)
+  elif args.use_glove:
+    raise NotImplementedError("Cross-lingual is only allowed for fasttext")
   else:
-    embd_dict = load_embedding_dict(vocab_path=args.embedding_vocab, vector_path=args.embedding_vectors, glove=False)
-  weat.set_embd_dict(embd_dict)
+    targets_embd_dict = load_embedding_dict(vocab_path=args.targets_embedding_vocab, vector_path=args.targets_embedding_vectors, glove=False)
+    attributes_embd_dict = load_embedding_dict(vocab_path=args.attributes_embedding_vocab,
+                                            vector_path=args.attributes_embedding_vectors, glove=False)
+  weat.set_embd_dicts(targets_embd_dict=targets_embd_dict, attributes_embd_dict=attributes_embd_dict)
 
   logging.info("Embeddings loaded")
   logging.info("Running test")

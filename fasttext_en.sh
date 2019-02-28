@@ -9,8 +9,8 @@
 #  parser.add_argument("--embedding_file", type=str)
 
 #for similarity_type in "cosine" "csls" ; do
-for similarity_type in "csls" ; do
-    for test_number in 1 2 3 4 5 ; do
+for similarity_type in "cosine" ; do
+    for test_number in 1 2 3 4 5 6 7 8 9 10 ; do
         echo $similarity_type
         echo $test_number
         python weat.py \
