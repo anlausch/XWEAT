@@ -459,27 +459,41 @@ def load_vocab_goran(path):
 def load_vectors_goran(path):
   return np.load(path)
 
-def load_embedding_dict(vocab_path="", vector_path="", glove=False):
+def load_embedding_dict(vocab_path="", vector_path="", embeddings_path="", glove=False, postspec=False):
   """
   >>> _load_embedding_dict()
   :param vocab_path:
   :param vector_path:
   :return: embd_dict
   """
-  if glove:
+  if glove and postspec:
+    raise ValueError("Glove and postspec cannot both be true")
+  elif glove:
     if os.name == "nt":
       embd_dict = utils.load_embeddings("C:/Users/anlausch/workspace/embedding_files/glove.6B/glove.6B.300d.txt",
                                         word2vec=False)
     else:
       embd_dict = utils.load_embeddings("/work/anlausch/glove.6B.300d.txt", word2vec=False)
     return embd_dict
-  embd_dict = {}
-  vocab = load_vocab_goran(vocab_path)
-  vectors = load_vectors_goran(vector_path)
-  for term, index in vocab.items():
-    embd_dict[term] = vectors[index]
-  assert len(embd_dict) == len(vocab)
-  return embd_dict
+  elif postspec:
+    embd_dict_temp = utils.load_embeddings("/work/anlausch/ft_postspec.txt", word2vec=False)
+    embd_dict = {}
+    for key, value in embd_dict_temp.items():
+      embd_dict[key.split("en_")[1]] = value
+    assert("test" in embd_dict)
+    assert ("house" in embd_dict)
+    return embd_dict
+  elif embeddings_path != "":
+    embd_dict = utils.load_embeddings(embeddings_path, word2vec=False)
+    return embd_dict
+  else:
+    embd_dict = {}
+    vocab = load_vocab_goran(vocab_path)
+    vectors = load_vectors_goran(vector_path)
+    for term, index in vocab.items():
+      embd_dict[term] = vectors[index]
+    assert len(embd_dict) == len(vocab)
+    return embd_dict
 
 def translate(translation_dict, terms):
   translation = []
@@ -500,6 +514,46 @@ def translate(translation_dict, terms):
   return translation
 
 
+def compute_oov_percentage():
+  """
+  >>> compute_oov_percentage()
+  :return:
+  """
+  with codecs.open("./results/oov_short.txt", "w", "utf8") as f:
+    for test in range(1,11):
+      f.write("Test %d \n" % test)
+      targets_1, targets_2, attributes_1, attributes_2 = XWEAT().__getattribute__("weat_" + str(test))()
+      vocab = targets_1 + targets_2 + attributes_1 + attributes_2
+      vocab = [t.lower() for t in vocab]
+      #f.write("English vocab: %s \n" % str(vocab))
+      for language in ["en", "es", "de", "tr", "ru", "hr", "it"]:
+        if language != "en":
+          #f.write("Translating terms from en to %s\n" % language)
+          translation_dict = load_vocab_goran("./data/vocab_dict_en_" + language + ".p")
+          vocab_translated = translate(translation_dict, vocab)
+          vocab_translated = [t.lower() for t in vocab_translated]
+          #f.write("Translated terms %s\n" % str(vocab))
+        embd_dict = load_embedding_dict(vocab_path="/work/gglavas/data/word_embs/yacle/fasttext/200K/npformat/ft.wiki."+language+".300.vocab", vector_path="/work/gglavas/data/word_embs/yacle/fasttext/200K/npformat/ft.wiki."+language+".300.vectors")
+        ins=[]
+        not_ins=[]
+        if language != "en":
+          for term in vocab_translated:
+            if term in embd_dict:
+              ins.append(term)
+            else:
+              not_ins.append(term)
+        else:
+          for term in vocab:
+            if term in embd_dict:
+              ins.append(term)
+            else:
+              not_ins.append(term)
+        #f.write("OOVs: %s\n" % str(not_ins))
+        f.write("OOV Percentage for language %s: %s\n" % (language, (len(not_ins)/len(vocab))))
+      f.write("\n")
+  f.close()
+
+
 def main():
   def boolean_string(s):
     if s not in {'False', 'True', 'false', 'true'}:
@@ -516,6 +570,9 @@ def main():
   parser.add_argument("--embedding_vocab", type=str, help="Vocab of the embeddings")
   parser.add_argument("--embedding_vectors", type=str, help="Vectors of the embeddings")
   parser.add_argument("--use_glove", type=boolean_string, default=False, help="Use glove")
+  parser.add_argument("--postspec", type=boolean_string, default=False, help="Use postspecialized fasttext")
+  parser.add_argument("--is_vec_format", type=boolean_string, default=False, help="Whether embeddings are in vec format")
+  parser.add_argument("--embeddings", type=str, help="Vectors and vocab of the embeddings")
   parser.add_argument("--lang", type=str, default="en", help="Language to test")
   args = parser.parse_args()
 
@@ -563,6 +620,12 @@ def main():
   if args.use_glove:
     logging.info("Using glove")
     embd_dict = load_embedding_dict(glove=True)
+  elif args.postspec:
+    logging.info("Using postspecialized embeddings")
+    embd_dict=load_embedding_dict(postspec=True)
+  elif args.is_vec_format:
+    logging.info("Embeddings are in vec format")
+    embd_dict = load_embedding_dict(embeddings_path=args.embeddings, glove=False)
   else:
     embd_dict = load_embedding_dict(vocab_path=args.embedding_vocab, vector_path=args.embedding_vectors, glove=False)
   weat.set_embd_dict(embd_dict)

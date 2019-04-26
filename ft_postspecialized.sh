@@ -8,17 +8,18 @@
 #                      required=False)
 #  parser.add_argument("--embedding_file", type=str)
 
-for similarity_type in "cosine" ; do
-#for similarity_type in "euclidean" ; do
+#for similarity_type in "cosine" "csls" ; do
+for similarity_type in "cosine" "euclidean" ; do
     for test_number in 1 2 3 4 5 6 7 8 9 10 ; do
         echo $similarity_type
         echo $test_number
         python weat.py \
             --test_number $test_number \
             --permutation_number 1000000 \
-            --output_file ./results/glove_wiki_${similarity_type}_${test_number}_cased.res \
-            --lower False \
-            --use_glove True \
-            --similarity_type $similarity_type |& tee ./results/glove_wiki_${similarity_type}_${test_number}_cased.out
+            --output_file ./results/ft_postspec_en_${similarity_type}_${test_number}.res \
+            --lower True \
+            --use_glove False \
+            --postspec True \
+            --similarity_type $similarity_type |& tee ./results/ft_postspec_en_${similarity_type}_${test_number}.out
     done
 done

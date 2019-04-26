@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
-#parser.add_argument("--test_number", type=int, help="Number of the weat test to run", required=False)
-#parser.add_argument("--permutation_number", type=int, default=None,
-#                     help="Number of permutations (otherwise all will be run)", required=False)
-#  parser.add_argument("--output_file", type=str, default=None, help="File to store the results)", required=False)
-#  parser.add_argument("--lower", type=bool, default=False, help="Whether to lower the vocab", required=False)
-#  parser.add_argument("--similarity_type", type=str, default="cosine", help="Which similarity function to use",
-#                      required=False)
-#  parser.add_argument("--embedding_file", type=str)
-
 #for similarity_type in "cosine" "csls" ; do
-for similarity_type in "cosine" "csls" ; do
+for similarity_type in "euclidean" ; do
     for test_number in 1 2 3 4 5 6 7 8 9 10 ; do
-        for language in "de" "es" "hr" "it" "ru" "tr" ; do
+        for language in "en" "de" "es" "hr" "it" "ru" "tr" ; do
             echo $language
             echo $similarity_type
             echo $test_number

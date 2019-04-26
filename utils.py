@@ -74,14 +74,25 @@ class LemmaTokenizer(object):
 
 # returns a dictionary of embeddings
 def load_embeddings(path, word2vec=False, rdf2vec=False):
+    """
+    >>> load_embeddings("/work/anlausch/glove_twitter/glove.twitter.27B.200d.txt")
+    :param path:
+    :param word2vec:
+    :param rdf2vec:
+    :return:
+    """
     embbedding_dict = {}
     if word2vec == False and rdf2vec == False:
         with codecs.open(path, "rb", "utf8", "ignore") as infile:
             for line in infile:
-                parts = line.split()
-                word = parts[0]
-                nums = [float(p) for p in parts[1:]]
-                embbedding_dict[word] = nums
+                try:
+                    parts = line.split()
+                    word = parts[0]
+                    nums = [float(p) for p in parts[1:]]
+                    embbedding_dict[word] = nums
+                except Exception as e:
+                    print(line)
+                    continue
         return embbedding_dict
     elif word2vec == True:
         #Load Google's pre-trained Word2Vec model.

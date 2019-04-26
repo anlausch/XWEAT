@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 #for similarity_type in "cosine" ; do
-for similarity_type in "euclidean" ; do
-    for test_number in 1 2 3 4 5 6 7 8 9 10 ; do
-        for targets_language in "en" "de" "hr" "it" "ru" "tr" ; do
-            for attributes_language in "en" "de" "hr" "it" "ru" "tr" ; do
+for similarity_type in "cosine" "euclidean" ; do
+    for targets_language in "en" "de" "hr" "it" "ru" "tr" ; do
+        for attributes_language in "en" "de" "hr" "it" "ru" "tr" ; do
+            for test_number in 6 7 8 9 10 1 2 ; do
                 echo $targets_language
                 echo $attributes_language
                 echo $similarity_type
@@ -21,7 +21,7 @@ for similarity_type in "euclidean" ; do
                     python xweat.py \
                         --test_number $test_number \
                         --permutation_number 1000000 \
-                        --output_file ./results/ft_xling_space-${targets_language}-${attributes_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.res \
+                        --output_file ./results/ft_xling2_space-${targets_language}-${attributes_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.res \
                         --lower True \
                         --use_glove False \
                         --targets_lang $targets_language \
@@ -34,7 +34,7 @@ for similarity_type in "euclidean" ; do
                         ${embedding_dir}/vocab_${targets_language}-${attributes_language}.${attributes_language}.yacle.train.freq.5k.pkl \
                         --attributes_embedding_vectors \
                         ${embedding_dir}/vectors_${targets_language}-${attributes_language}.${attributes_language}.yacle.train.freq.5k.np \
-                        --similarity_type $similarity_type |& tee ./results/ft_xling_space-${targets_language}-${attributes_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.out
+                        --similarity_type $similarity_type |& tee ./results/ft_xling2_space-${targets_language}-${attributes_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.out
                 fi
                 if [ -d "$dir_2" ]; then
                     embedding_dir=$dir_2
@@ -42,7 +42,7 @@ for similarity_type in "euclidean" ; do
                     python xweat.py \
                         --test_number $test_number \
                         --permutation_number 1000000 \
-                        --output_file ./results/ft_xling_space-${attributes_language}-${targets_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.res \
+                        --output_file ./results/ft_xling2_space-${attributes_language}-${targets_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.res \
                         --lower True \
                         --use_glove False \
                         --targets_lang $targets_language \
@@ -55,7 +55,7 @@ for similarity_type in "euclidean" ; do
                         ${embedding_dir}/vocab_${attributes_language}-${targets_language}.${attributes_language}.yacle.train.freq.5k.pkl \
                         --attributes_embedding_vectors \
                         ${embedding_dir}/vectors_${attributes_language}-${targets_language}.${attributes_language}.yacle.train.freq.5k.np \
-                        --similarity_type $similarity_type |& tee ./results/ft_xling_space-${attributes_language}-${targets_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.out
+                        --similarity_type $similarity_type |& tee ./results/ft_xling2_space-${attributes_language}-${targets_language}_ta-${targets_language}-${attributes_language}_${similarity_type}_${test_number}.out
                 fi
             done
         done
