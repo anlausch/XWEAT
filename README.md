@@ -55,4 +55,4 @@ done
 ```
 For more information on our approach, experiments, and results we refer to our paper:
 
-Lauscher A. and Glavas G. (2019). Are We Consistently Biased? Multidimensional Analysis of Biases in DistributionalWord Vectors. To appear at *SEM 2019.
+Lauscher A. and Glavas G. (2019). Are We Consistently Biased? Multidimensional Analysis of Biases in Distributional Word Vectors. To appear at *SEM 2019.
